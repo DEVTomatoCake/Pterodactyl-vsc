@@ -2,8 +2,8 @@
 	"name": "vscode-memfs",
 	"displayName": "MemFS - a file system provider sample",
 	"description": "Showcase for the file system provider API, also useful for testing again document that are not on disk.",
-	"version": "0.0.3",
-	"publisher": "vscode-samples",
+	"version": "1.0.0",
+	"publisher": "tomatocake",
 	"private": true,
 	"license": "MIT",
 	"repository": {
@@ -17,61 +17,41 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onFileSystem:memfs"
+		"onFileSystem:pterodactyl"
 	],
 	"main": "./out/src/extension",
 	"contributes": {
 		"commands": [
 			{
-				"command": "memfs.workspaceInit",
+				"command": "pterodactyl.init",
 				"title": "Setup Workspace",
-				"category": "MemFS"
+				"category": "Pterodactyl"
 			},
 			{
-				"command": "memfs.init",
-				"title": "Create Files",
-				"category": "MemFS"
-			},
-			{
-				"command": "memfs.reset",
-				"title": "Delete Files",
-				"category": "MemFS"
-			},
-			{
-				"command": "memfs.deleteFile",
-				"title": "Delete \"file.txt\"",
-				"category": "MemFS"
-			},
-			{
-				"command": "memfs.addFile",
-				"title": "Add \"file.txt\"",
-				"category": "MemFS"
+				"command": "pterodactyl.reset",
+				"title": "Reset workspace config",
+				"category": "Pterodactyl"
 			}
 		],
 		"menus": {
 			"commandPalette": [
 				{
-					"command": "memfs.init",
-					"when": "workbenchState == workspace"
-				},
-				{
-					"command": "memfs.reset",
-					"when": "workbenchState == workspace"
-				},
-				{
-					"command": "memfs.deleteFile",
-					"when": "workbenchState == workspace"
-				},
-				{
-					"command": "memfs.addFile",
-					"when": "workbenchState == workspace"
-				},
-				{
-					"command": "memfs.workspaceInit",
+					"command": "pterodactyl.init",
 					"when": "workbenchState != workspace"
+				},
+				{
+					"command": "pterodactyl.reset",
+					"when": "workbenchState == workspace"
 				}
 			]
-		}
+		},
+        "viewsWelcome": [
+            {
+                "view": "explorer",
+                "contents": "Open a Pterodactyl server folder as a remove workspace.\n[Open Pterodactyl select](command:pterodactyl.init)",
+                "when": "workspaceFolderCount == 0"
+            }
+        ]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
@@ -80,11 +60,13 @@
 		"watch": "tsc -watch -p ./"
 	},
 	"devDependencies": {
-		"@types/node": "^16.18.76",
+		"@types/node": "^20.11.7",
 		"@types/vscode": "^1.85.0",
 		"@typescript-eslint/eslint-plugin": "^6.19.1",
 		"@typescript-eslint/parser": "^6.19.1",
 		"eslint": "^8.56.0",
+		"eslint-plugin-sonarjs": "^0.23.0",
+		"eslint-plugin-unicorn": "^50.0.1",
 		"typescript": "^5.3.3"
 	}
 }
