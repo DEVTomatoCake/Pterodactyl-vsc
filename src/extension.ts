@@ -36,9 +36,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.reset", _ => {
 		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0)
 
-		state.update("panelUrl", undefined)
-		state.update("serverId", undefined)
-		state.update("apiKey", undefined)
+		state.update("panelUrl", void 0)
+		state.update("serverId", void 0)
+		state.update("apiKey", void 0)
 
 		serverApiUrl = ""
 		authHeader = ""
@@ -47,53 +47,51 @@ export function activate(context: vscode.ExtensionContext) {
 	}))
 }
 
-// Modified by TompatoCake from https://github.com/kowd/vscode-webdav/blob/12a5f44d60ccf81430d70f3e50b04259524a403f/src/extension.ts#L147
-function validatePanelURL(value: string): string | undefined {
+// Modified by TomatoCake from https://github.com/kowd/vscode-webdav/blob/12a5f44d60ccf81430d70f3e50b04259524a403f/src/extension.ts#L147
+const validatePanelURL = (value: string): string | undefined => {
 	if (value) {
 		try {
-			let uri = vscode.Uri.parse(value.trim())
-			if (!["http", "https"].some(s => s == uri.scheme.toLowerCase())) return `Unsupported protocol: ${uri.scheme}`
+			const uri = vscode.Uri.parse(value.trim())
+			if (uri.scheme != "http" && uri.scheme != "https") return "Unsupported protocol: " + uri.scheme
 		} catch {
-			return "Enter a valid URI"
+			return "Enter a valid URL"
 		}
-	} else return "Enter a valid URI"
+	} else return "Enter a valid URL"
 }
 
 async function addPanel() {
-	/*const url = await vscode.window.showInputBox({
+	const url = await vscode.window.showInputBox({
 		prompt: "Enter the Pterodactyl panel URL",
-		placeHolder: "Enter the main Pterodactyl panel URL here...",
+		placeHolder: "Enter a Pterodactyl panel URL here...",
 		validateInput: validatePanelURL
 	})
-	if (!url || validatePanelURL(url)) return*/
-	const url = "https://panel.chaoshosting.eu/server/49283264"
+	if (!url || validatePanelURL(url)) return
 
-	let panelUrl = vscode.Uri.parse(url.trim())
+	const panelUrl = vscode.Uri.parse(url.trim())
 
 	const apiKey = await vscode.window.showInputBox({
 		prompt: "Enter your Pterodactyl API key",
 		placeHolder: "Enter your Pterodactyl API key here...",
-		validateInput: (value: string) => value ? (value.length == 48 ? undefined : "API keys are 48 characters long") : "Enter a valid API key",
+		validateInput: (value: string) => value ? (value.length == 48 ? void 0 : "API keys are 48 characters long") : "Enter a valid API key",
 		password: true
 	})
 	if (!apiKey || apiKey.length != 48) return vscode.window.showErrorMessage("Invalid API key, must be 48 characters long")
 
+	log("Connecting to " + panelUrl.scheme + "://" + panelUrl.authority + "...")
 	const req = await fetch(panelUrl.scheme + "://" + panelUrl.authority + "/api/client/", {
 		headers: {
 			Accept: "application/json",
 			Authorization: "Bearer " + apiKey
 		}
 	})
+	log("Connection response: " + req.status + " " + req.statusText)
 	if (!req.ok) return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel: " + req.status + " " + req.statusText)
 
-	let json: any = {}
-	try {
-		json = await req.json()
-	} catch (e) {
-		return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel: " + e)
-	}
+	const json: any = await req.json()
+	log(json)
 	state.update("apiKey", apiKey)
 
+	log("Connected successfully, " + json.data.length + " servers found")
 	const serverId: any = await vscode.window.showQuickPick(json.data.map((server: any) => ({
 		label: server.attributes.name,
 		description: server.attributes.identifier,

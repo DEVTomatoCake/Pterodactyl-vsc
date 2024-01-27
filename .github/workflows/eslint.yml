@@ -1,0 +1,25 @@
+name: ESLint
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - name: "☁️ checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "🔧 setup node"
+        uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: "npm"
+
+      - name: "🛸 install eslint plugins"
+        run: npm i --omit=optional --include=dev --no-fund --progress=false
+
+      - name: "🔍 lint code"
+        run: npm run lint

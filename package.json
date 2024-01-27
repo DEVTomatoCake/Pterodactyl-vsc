@@ -5,6 +5,11 @@
 	"version": "1.0.0",
 	"publisher": "tomatocake",
 	"license": "MIT",
+	"main": "./out/src/extension",
+	"browser": "./out/web/extension",
+	"extensionKind": [
+		"workspace"
+	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/TomatoCake/Pterodactyl-vsc.git"
@@ -23,14 +28,14 @@
 		"ptero",
 		"file-system-provider"
 	],
-	"main": "./out/src/extension",
 	"contributes": {
 		"commands": [
 			{
 				"command": "pterodactyl.init",
 				"title": "Connect to panel",
 				"category": "Pterodactyl"
-			},{
+			},
+			{
 				"command": "pterodactyl.reset",
 				"title": "Reset workspace config",
 				"category": "Pterodactyl"
@@ -41,7 +46,8 @@
 				{
 					"command": "pterodactyl.init",
 					"when": "workbenchState != workspace"
-				},{
+				},
+				{
 					"command": "pterodactyl.reset",
 					"when": "workbenchState == workspace"
 				}
@@ -59,13 +65,17 @@
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
 		"lint": "eslint \"src/**/*.ts\"",
-		"watch": "tsc -watch -p ./"
+		"watch": "tsc -watch -p ./",
+		"ls": "vsce ls",
+		"pack": "vsce pack -o ./out/vsix -t web",
+		"publish": "vsce publish",
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.7",
 		"@types/vscode": "^1.85.0",
 		"@typescript-eslint/eslint-plugin": "^6.19.1",
 		"@typescript-eslint/parser": "^6.19.1",
+		"@vscode/vsce": "^2.23.0",
 		"eslint": "^8.56.0",
 		"eslint-plugin-sonarjs": "^0.23.0",
 		"eslint-plugin-unicorn": "^50.0.1",
