@@ -1,14 +1,13 @@
 {
-	"name": "vscode-memfs",
-	"displayName": "MemFS - a file system provider sample",
-	"description": "Showcase for the file system provider API, also useful for testing again document that are not on disk.",
+	"name": "pterodactyl-vsc",
+	"displayName": "Pterodactyl file system",
+	"description": "Open a Pterodactyl server folder as a remote workspace.",
 	"version": "1.0.0",
 	"publisher": "tomatocake",
-	"private": true,
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Microsoft/vscode-extension-samples"
+		"url": "https://github.com/TomatoCake/Pterodactyl-vsc.git"
 	},
 	"engines": {
 		"vscode": "^1.85.0"
@@ -19,15 +18,19 @@
 	"activationEvents": [
 		"onFileSystem:pterodactyl"
 	],
+	"keywords": [
+		"pterodactyl",
+		"ptero",
+		"file-system-provider"
+	],
 	"main": "./out/src/extension",
 	"contributes": {
 		"commands": [
 			{
 				"command": "pterodactyl.init",
-				"title": "Setup Workspace",
+				"title": "Connect to panel",
 				"category": "Pterodactyl"
-			},
-			{
+			},{
 				"command": "pterodactyl.reset",
 				"title": "Reset workspace config",
 				"category": "Pterodactyl"
@@ -38,20 +41,19 @@
 				{
 					"command": "pterodactyl.init",
 					"when": "workbenchState != workspace"
-				},
-				{
+				},{
 					"command": "pterodactyl.reset",
 					"when": "workbenchState == workspace"
 				}
 			]
 		},
-        "viewsWelcome": [
-            {
-                "view": "explorer",
-                "contents": "Open a Pterodactyl server folder as a remove workspace.\n[Open Pterodactyl select](command:pterodactyl.init)",
-                "when": "workspaceFolderCount == 0"
-            }
-        ]
+		"viewsWelcome": [
+			{
+				"view": "explorer",
+				"contents": "Open a Pterodactyl server folder as a remote workspace.\n[Connect to Pterodactyl panel](command:pterodactyl.init)",
+				"when": "workspaceFolderCount == 0"
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

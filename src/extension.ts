@@ -2,55 +2,32 @@
 
 import * as vscode from "vscode"
 
-let secrets: vscode.SecretStorage | undefined
-let state: vscode.Memento | undefined
+export let state: vscode.Memento
+
 let serverApiUrl = ""
-let isRegistered = false
+let authHeader = ""
 
 let outputChannel: vscode.OutputChannel
 const log = (message: any): void => {
+	//console.log(message)
 	outputChannel.appendLine(message)
-	console.log(message)
 }
 
 export function activate(context: vscode.ExtensionContext) {
-	secrets = context.secrets
 	state = context.globalState
 
 	context.subscriptions.push(
-		outputChannel = vscode.window.createOutputChannel("Pterodactyl")
+		outputChannel = vscode.window.createOutputChannel("Pterodactyl file system")
 	)
-	//outputChannel.hide()
 	log("Loading extension...")
 
-	context.subscriptions.push(vscode.workspace.registerFileSystemProvider("pterodactyl", new PterodactylFileSystemProvider(), { isCaseSensitive: true }))
-	isRegistered = true
-	log("Registered Pterodactyl file system provider")
+	const fsProvider = new PterodactylFileSystemProvider()
+	context.subscriptions.push(vscode.workspace.registerFileSystemProvider("pterodactyl", fsProvider, { isCaseSensitive: true }))
 
-	/*let initialized = false
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.reset", _ => {
-		for (const [name] of memFs.readDirectory(vscode.Uri.parse("pterodactyl:/"))) {
-			memFs.delete(vscode.Uri.parse("pterodactyl:/" + name))
-		}
-		initialized = false
-	}))
-
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.deleteFile", _ => {
-		if (initialized) {
-			memFs.delete(vscode.Uri.parse("pterodactyl:/file.txt"))
-		}
-	}))
-
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.init", _ => {
-		if (initialized) return
-		initialized = true
-
-		memFs.createDirectory(vscode.Uri.parse("pterodactyl:/folder/"))
-		memFs.writeFile(vscode.Uri.parse("pterodactyl:/file.html"), Buffer.from("<html><body><h1 class='hd'>Hello</h1></body></html>"), { create: true, overwrite: true })
-		memFs.writeFile(vscode.Uri.parse("pterodactyl:/file.js"), Buffer.from("console.log('JavaScript')"), { create: true, overwrite: true })
-		memFs.writeFile(vscode.Uri.parse("pterodactyl:/file.json"), Buffer.from("{ \"json\": true }"), { create: true, overwrite: true })
-		memFs.writeFile(vscode.Uri.parse("pterodactyl:/folder/file.ts"), Buffer.from("let a:number = true console.log(a)"), { create: true, overwrite: true })
-	}))*/
+	if (state.get("panelUrl") && state.get("apiKey")) {
+		serverApiUrl = state.get("panelUrl") + "/api/client/servers/" + state.get("serverId") + "/files"
+		authHeader = "Bearer " + state.get("apiKey")
+	}
 
 	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.init", _ => {
 		addPanel()
@@ -59,11 +36,12 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.reset", _ => {
 		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0)
 
-		state?.update("panelUrl", undefined)
-		state?.update("serverId", undefined)
+		state.update("panelUrl", undefined)
+		state.update("serverId", undefined)
+		state.update("apiKey", undefined)
 
 		serverApiUrl = ""
-		secrets?.delete(serverApiUrl)
+		authHeader = ""
 
 		log("Reset workspace")
 	}))
@@ -95,6 +73,7 @@ async function addPanel() {
 	const apiKey = await vscode.window.showInputBox({
 		prompt: "Enter your Pterodactyl API key",
 		placeHolder: "Enter your Pterodactyl API key here...",
+		validateInput: (value: string) => value ? (value.length == 48 ? undefined : "API keys are 48 characters long") : "Enter a valid API key",
 		password: true
 	})
 	if (!apiKey || apiKey.length != 48) return vscode.window.showErrorMessage("Invalid API key, must be 48 characters long")
@@ -113,7 +92,7 @@ async function addPanel() {
 	} catch (e) {
 		return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel: " + e)
 	}
-	secrets?.store(panelUrl.scheme + panelUrl.authority, apiKey)
+	state.update("apiKey", apiKey)
 
 	const serverId: any = await vscode.window.showQuickPick(json.data.map((server: any) => ({
 		label: server.attributes.name,
@@ -125,22 +104,16 @@ async function addPanel() {
 	if (!serverId) return
 
 	serverApiUrl = panelUrl.scheme + "://" + panelUrl.authority + "/api/client/servers/" + serverId.description + "/files"
+	authHeader = "Bearer " + apiKey
 	log("Setting server API URL to " + serverApiUrl)
 
-	if (!isRegistered) {
-		vscode.workspace.registerFileSystemProvider("pterodactyl", new PterodactylFileSystemProvider(), { isCaseSensitive: true })
-		isRegistered = true
-		log("Force registered Pterodactyl file system provider")
-	}
+	state.update("panelUrl", panelUrl.scheme + "://" + panelUrl.authority)
+	state.update("serverId", serverId.description)
 
-	log("Opening " + vscode.Uri.parse("pterodactyl:/" + serverId.description))
 	vscode.workspace.updateWorkspaceFolders(0, 0, {
-		uri: vscode.Uri.parse("pterodactyl:/" + serverId.description),
+		uri: vscode.Uri.parse("pterodactyl:/"),
 		name: "Pterodactyl - " + json.data.find((server: any) => server.attributes.identifier == serverId.description)?.attributes.name
 	})
-
-	state?.update("panelUrl", panelUrl.scheme + "://" + panelUrl.authority)
-	state?.update("serverId", serverId.description)
 }
 
 export class PterodactylFileSystemProvider implements vscode.FileSystemProvider {
@@ -154,44 +127,64 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 
 	public readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]>
 
-	private forConnection(operation: string, res: Response): void {
+	private removeStartSlash(path: string): string {
+		return path.replace(/^\//, "")
+	}
+
+	private async forConnection(operation: string, res: Response): Promise<void> {
 		log(operation + ": " + res.status + " " + res.statusText)
 		switch (res.status) {
 			case 401:
-				vscode.window.showWarningMessage(`Authentication failed for ${vscode.Uri.parse(serverApiUrl).authority}.`, "Authenticate")
+				const message = await vscode.window.showWarningMessage("Authentication failed for " + vscode.Uri.parse(serverApiUrl).authority + ".", "Authenticate")
+				if (message == "Authenticate") addPanel()
 				throw vscode.FileSystemError.NoPermissions(res.url)
 			case 403:
 				throw vscode.FileSystemError.NoPermissions(res.url)
 			case 404:
 				throw vscode.FileSystemError.FileNotFound(res.url)
+			case 429:
+				throw vscode.FileSystemError.Unavailable("You have been ratelimited by the Pterodactyl panel.")
 		}
 	}
 
-	public async copy(source: vscode.Uri, destination: vscode.Uri): Promise<void> {
+	public async copy(source: vscode.Uri, destination: vscode.Uri, options: { overwrite: boolean } = { overwrite: false }): Promise<void> {
+		if (options.overwrite) {
+			try {
+				await this.delete(destination)
+			} catch {}
+		}
+
 		const copyRes = await fetch(serverApiUrl + "/copy", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			},
 			body: JSON.stringify({
 				location: source.path
 			})
 		})
-		if (!copyRes.ok) throw await copyRes.json()
 		this.forConnection("copy: " + source.path + " -> " + destination.path, copyRes)
+		if (!copyRes.ok) throw await copyRes.json()
+
+		const oldPath = source.path.split("/").slice(0, -1).join("/") || "/"
+		const oldName = source.path.split("/").pop()
+		const copiedLoc = oldName?.split(".").slice(0, -1).join(".") + " copy." + oldName?.split(".").pop()
+		const newPath = destination.path.split("/").slice(0, -1).join("/") || "/"
+		if (oldPath == newPath) return log("copy: Not renaming file " + newPath + "/" + copiedLoc)
+		log("copy: " + oldPath + "/" + copiedLoc + " -> " + newPath + "/" + destination.path.split("/").pop())
 
 		const renameRes = await fetch(serverApiUrl + "/rename", {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			},
 			body: JSON.stringify({
 				root: "/",
 				files: [{
-					from: source.path + " copy",
-					to: destination.path
+					from: this.removeStartSlash(oldPath + "/") + copiedLoc,
+					to: this.removeStartSlash(newPath + "/") + destination.path.split("/").pop()
 				}]
 			})
 		})
@@ -205,73 +198,95 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			},
 			body: JSON.stringify({
 				root: "/",
-				folders: [uri.path]
+				name: uri.path
 			})
 		})
 		this.forConnection("createDirectory: " + uri, res)
+		if (res.status == 403) throw vscode.FileSystemError.NoPermissions(uri)
 	}
 
-	public async delete(uri: vscode.Uri): Promise<void> {
+	public async delete(uri: vscode.Uri, options: { recursive: boolean } = { recursive: true }): Promise<void> {
+		if (options.recursive === false) {
+			let items: any = []
+			try {
+				items = await this.readDirectory(uri)
+			} catch {}
+
+			if (items && items.length > 0) throw vscode.FileSystemError.Unavailable("Directory not empty")
+		}
+
 		const res = await fetch(serverApiUrl + "/delete", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			},
 			body: JSON.stringify({
 				root: "/",
-				files: [uri.path]
+				files: [this.removeStartSlash(uri.path)]
 			})
 		})
 		this.forConnection("delete: " + uri, res)
+		if (res.status == 403) throw vscode.FileSystemError.NoPermissions(uri)
 	}
 
 	public async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
 		const res = await fetch(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path), {
 			headers: {
-				Authorization: "Bearer " + secrets?.get(serverApiUrl),
+				Authorization: authHeader,
 				Accept: "application/json"
 			}
 		})
+		if (!res.ok) {
+			const json: any = await res.json()
+			if (json.errors[0].code == "DaemonConnectionException") throw vscode.FileSystemError.FileNotFound(uri)
+			throw vscode.FileSystemError.Unavailable(json.errors[0].detail)
+		}
 		this.forConnection("readDirectory: " + uri, res)
 
 		const json: any = await res.json()
 		return json.data.map((file: any) => [
-			file.name,
-			file.is_file ?
-				(file.is_symlink ? vscode.FileType.File | vscode.FileType.SymbolicLink : vscode.FileType.File) :
-				(file.is_symlink ? vscode.FileType.Directory | vscode.FileType.SymbolicLink : vscode.FileType.Directory)
+			file.attributes.name,
+			file.attributes.is_file ?
+				(file.attributes.is_symlink ? vscode.FileType.File | vscode.FileType.SymbolicLink : vscode.FileType.File) :
+				(file.attributes.is_symlink ? vscode.FileType.Directory | vscode.FileType.SymbolicLink : vscode.FileType.Directory)
 		])
 	}
 
 	public async readFile(uri: vscode.Uri): Promise<Uint8Array> {
 		const res = await fetch(serverApiUrl + "/contents?file=" + encodeURIComponent(uri.path), {
 			headers: {
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			}
 		})
 		this.forConnection("readFile: " + uri, res)
+		if (!res.ok) throw vscode.FileSystemError.FileNotFound(uri)
 
-		// @ts-ignore
-		return res.body
+		return new Uint8Array(await res.arrayBuffer())
 	}
 
-	public async rename(oldUri: vscode.Uri, newUri: vscode.Uri): Promise<void> {
+	public async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean } = { overwrite: false }): Promise<void> {
+		if (options.overwrite) {
+			try {
+				await this.delete(newUri)
+			} catch {}
+		}
+
 		const res = await fetch(serverApiUrl + "/rename", {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			},
 			body: JSON.stringify({
 				root: "/",
 				files: [{
-					from: oldUri.path,
-					to: newUri.path
+					from: this.removeStartSlash(oldUri.path),
+					to: this.removeStartSlash(newUri.path)
 				}]
 			})
 		})
@@ -279,32 +294,40 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
-		const res = await fetch(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path), {
+		if (uri.path == "/") return {
+			ctime: 0,
+			mtime: 0,
+			size: 0,
+			type: vscode.FileType.Directory
+		}
+
+		const folderPath = uri.path.split("/").slice(0, -1).join("/") || "/"
+		const res = await fetch(serverApiUrl + "/list?directory=" + encodeURIComponent(folderPath), {
 			headers: {
-				Authorization: "Bearer " + secrets?.get(serverApiUrl),
+				Authorization: authHeader,
 				Accept: "application/json"
 			}
 		})
 		this.forConnection("stat: " + uri, res)
 
 		const json: any = await res.json()
-		log(json)
-		const file = json.data.find((file: any) => file.name == uri.path.split("/").pop()).attributes
-		log(file)
+		if (!res.ok) {
+			if (json.errors[0].code == "DaemonConnectionException") throw vscode.FileSystemError.FileNotFound(uri)
+			throw vscode.FileSystemError.Unavailable(json.errors[0].detail)
+		}
+
+		const file = json.data.find((file: any) => file.attributes.name == uri.path.split("/").pop())?.attributes
+		if (!file) throw vscode.FileSystemError.FileNotFound(uri)
 
 		return {
-			ctime: file.created_at,
-			mtime: file.modified_at,
-			permissions: file.is_editable ? void 0 : vscode.FilePermission.Readonly,
+			ctime: new Date(file.created_at).getTime(),
+			mtime: new Date(file.modified_at).getTime(),
+			permissions: file.mode[2] == "w" ? void 0 : vscode.FilePermission.Readonly,
 			size: file.size,
 			type: file.is_file
 				? (file.is_symlink ? vscode.FileType.File | vscode.FileType.SymbolicLink : vscode.FileType.File)
 				: (file.is_symlink ? vscode.FileType.Directory | vscode.FileType.SymbolicLink : vscode.FileType.Directory)
 		}
-	}
-
-	public watch(): vscode.Disposable {
-		return { dispose: () => { } }
 	}
 
 	public async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
@@ -320,10 +343,17 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 		const res = await fetch(serverApiUrl + "/write?file=" + uri.path, {
 			method: "POST",
 			headers: {
-				Authorization: "Bearer " + secrets?.get(serverApiUrl)
+				Authorization: authHeader
 			},
 			body: content
 		})
 		this.forConnection("writeFile: " + uri, res)
+		if (res.status == 403) throw vscode.FileSystemError.NoPermissions(uri)
+	}
+
+	public watch(): vscode.Disposable {
+		return {
+			dispose: () => {}
+		}
 	}
 }

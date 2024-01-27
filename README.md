@@ -1,3 +1,6 @@
-# MemFS
+# Pterodactyl server files in VS Code
 
-Base yoinked from [microsoft/vscode-extension-samples](https://github.com/microsoft/vscode-extension-samples/tree/main/fsprovider-sample)
+## Credits
+
+- Base yoinked from [microsoft/vscode-extension-samples](https://github.com/microsoft/vscode-extension-samples/tree/main/fsprovider-sample) (MIT License)
+- Most of the logic from [kowd/vscode-webdav](https://github.com/kowd/vscode-webdav) (MIT License)
