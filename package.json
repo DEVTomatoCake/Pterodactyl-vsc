@@ -6,7 +6,7 @@
 	"publisher": "tomatocake",
 	"license": "MIT",
 	"main": "./out/src/extension",
-	"browser": "./out/web/extension",
+	"browser": "./out/src/extension",
 	"extensionKind": [
 		"workspace"
 	],
@@ -31,12 +31,12 @@
 	"contributes": {
 		"commands": [
 			{
-				"command": "pterodactyl.init",
-				"title": "Connect to panel",
+				"command": "pterodactyl-vsc.init",
+				"title": "Connect to server",
 				"category": "Pterodactyl"
 			},
 			{
-				"command": "pterodactyl.reset",
+				"command": "pterodactyl-vsc.reset",
 				"title": "Reset workspace config",
 				"category": "Pterodactyl"
 			}
@@ -44,11 +44,11 @@
 		"menus": {
 			"commandPalette": [
 				{
-					"command": "pterodactyl.init",
+					"command": "pterodactyl-vsc.init",
 					"when": "workbenchState != workspace"
 				},
 				{
-					"command": "pterodactyl.reset",
+					"command": "pterodactyl-vsc.reset",
 					"when": "workbenchState == workspace"
 				}
 			]
@@ -56,19 +56,56 @@
 		"viewsWelcome": [
 			{
 				"view": "explorer",
-				"contents": "Open a Pterodactyl server folder as a remote workspace.\n[Connect to Pterodactyl panel](command:pterodactyl.init)",
+				"contents": "Open a Pterodactyl server folder as a remote workspace.\n[Add Pterodactyl panel](command:pterodactyl-vsc.init)",
 				"when": "workspaceFolderCount == 0"
 			}
-		]
+		],
+		"configuration": {
+			"title": "Pterodactyl file system",
+			"properties": {
+				"pterodactyl-vsc.panelUrl": {
+					"type": "string",
+					"default": "",
+					"description": "Pterodactyl panel URL to connect to.",
+					"format": "uri"
+				},
+				"pterodactyl-vsc.serverId": {
+					"type": "string",
+					"default": "",
+					"description": "Server ID of the server you want to edit the files of, found in the URL.",
+					"minLength": 8,
+					"maxLength": 8,
+					"pattern": "^[a-z0-9]{8}$",
+					"patternErrorMessage": "Invalid short server ID."
+				},
+				"pterodactyl-vsc.apiKey": {
+					"type": "string",
+					"default": "",
+					"description": "Client API key for the Pterodactyl panel set above, found in Account Settings -> API Credentials.",
+					"minLength": 48,
+					"maxLength": 48,
+					"pattern": "^ptlc_[a-zA-Z0-9]{43}$",
+					"patternErrorMessage": "Invalid client API key."
+				},
+				"pterodactyl-vsc.proxyUrl": {
+					"type": "string",
+					"default": "https://pterodactyl-vsc.tomatocake.workers.dev/?url=",
+					"description": "CORS proxy to use. Leave empty to disable.",
+					"format": "uri"
+				}
+			}
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
-		"lint": "eslint \"src/**/*.ts\"",
+		"lint": "eslint --ext .ts",
 		"watch": "tsc -watch -p ./",
-		"ls": "vsce ls",
-		"pack": "vsce pack -o ./out/vsix -t web",
+		"pack": "vsce pack -o ./out/pterodactyl-vsc.vsix -t web",
+		"pack-files": "vsce ls",
 		"publish": "vsce publish",
+		"sideload": "npx serve --cors -l 5000 --ssl-cert $HOME/certs/localhost.pem --ssl-key $HOME/certs/localhost-key.pem",
+		"sideload-win": "npx serve --cors -l 5000 --ssl-cert %userprofile%\\certs\\localhost.pem --ssl-key %userprofile%\\certs\\localhost-key.pem"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.7",

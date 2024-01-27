@@ -2,20 +2,14 @@
 
 import * as vscode from "vscode"
 
-export let state: vscode.Memento
-
 let serverApiUrl = ""
 let authHeader = ""
 
 let outputChannel: vscode.OutputChannel
-const log = (message: any): void => {
-	//console.log(message)
-	outputChannel.appendLine(message)
-}
+const log = (message: any): void => outputChannel.appendLine(message)
+const proxyUrl = (url: string): string => vscode.workspace.getConfiguration("pterodactyl-vsc").get("proxyUrl") + encodeURIComponent(url)
 
 export function activate(context: vscode.ExtensionContext) {
-	state = context.globalState
-
 	context.subscriptions.push(
 		outputChannel = vscode.window.createOutputChannel("Pterodactyl file system")
 	)
@@ -24,21 +18,16 @@ export function activate(context: vscode.ExtensionContext) {
 	const fsProvider = new PterodactylFileSystemProvider()
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider("pterodactyl", fsProvider, { isCaseSensitive: true }))
 
-	if (state.get("panelUrl") && state.get("apiKey")) {
-		serverApiUrl = state.get("panelUrl") + "/api/client/servers/" + state.get("serverId") + "/files"
-		authHeader = "Bearer " + state.get("apiKey")
-	}
+	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") && vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId"))
+		serverApiUrl = vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
+	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
 
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.init", _ => {
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.init", _ => {
 		addPanel()
 	}))
 
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl.reset", _ => {
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.reset", _ => {
 		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0)
-
-		state.update("panelUrl", void 0)
-		state.update("serverId", void 0)
-		state.update("apiKey", void 0)
 
 		serverApiUrl = ""
 		authHeader = ""
@@ -47,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 	}))
 }
 
-// Modified by TomatoCake from https://github.com/kowd/vscode-webdav/blob/12a5f44d60ccf81430d70f3e50b04259524a403f/src/extension.ts#L147
+// Modified from https://github.com/kowd/vscode-webdav/blob/12a5f44d60ccf81430d70f3e50b04259524a403f/src/extension.ts#L147
 const validatePanelURL = (value: string): string | undefined => {
 	if (value) {
 		try {
@@ -78,7 +67,7 @@ async function addPanel() {
 	if (!apiKey || apiKey.length != 48) return vscode.window.showErrorMessage("Invalid API key, must be 48 characters long")
 
 	log("Connecting to " + panelUrl.scheme + "://" + panelUrl.authority + "...")
-	const req = await fetch(panelUrl.scheme + "://" + panelUrl.authority + "/api/client/", {
+	const req = await fetch(proxyUrl(panelUrl.scheme + "://" + panelUrl.authority + "/api/client/"), {
 		headers: {
 			Accept: "application/json",
 			Authorization: "Bearer " + apiKey
@@ -89,7 +78,7 @@ async function addPanel() {
 
 	const json: any = await req.json()
 	log(json)
-	state.update("apiKey", apiKey)
+	vscode.workspace.getConfiguration("pterodactyl-vsc").update("apiKey", apiKey)
 
 	log("Connected successfully, " + json.data.length + " servers found")
 	const serverId: any = await vscode.window.showQuickPick(json.data.map((server: any) => ({
@@ -103,10 +92,10 @@ async function addPanel() {
 
 	serverApiUrl = panelUrl.scheme + "://" + panelUrl.authority + "/api/client/servers/" + serverId.description + "/files"
 	authHeader = "Bearer " + apiKey
-	log("Setting server API URL to " + serverApiUrl)
+	log("Setting server api URL & auth header to " + serverApiUrl)
 
-	state.update("panelUrl", panelUrl.scheme + "://" + panelUrl.authority)
-	state.update("serverId", serverId.description)
+	vscode.workspace.getConfiguration("pterodactyl-vsc").update("panelUrl", panelUrl.scheme + "://" + panelUrl.authority)
+	vscode.workspace.getConfiguration("pterodactyl-vsc").update("serverId", serverId.description)
 
 	vscode.workspace.updateWorkspaceFolders(0, 0, {
 		uri: vscode.Uri.parse("pterodactyl:/"),
@@ -152,7 +141,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			} catch {}
 		}
 
-		const copyRes = await fetch(serverApiUrl + "/copy", {
+		const copyRes = await fetch(proxyUrl(serverApiUrl + "/copy"), {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -169,10 +158,10 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 		const oldName = source.path.split("/").pop()
 		const copiedLoc = oldName?.split(".").slice(0, -1).join(".") + " copy." + oldName?.split(".").pop()
 		const newPath = destination.path.split("/").slice(0, -1).join("/") || "/"
-		if (oldPath == newPath) return log("copy: Not renaming file " + newPath + "/" + copiedLoc)
+		if (oldPath == newPath) return log("copy: Not renaming file " + newPath + "/" + copiedLoc + " due to same directory")
 		log("copy: " + oldPath + "/" + copiedLoc + " -> " + newPath + "/" + destination.path.split("/").pop())
 
-		const renameRes = await fetch(serverApiUrl + "/rename", {
+		const renameRes = await fetch(proxyUrl(serverApiUrl + "/rename"), {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
@@ -192,7 +181,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async createDirectory(uri: vscode.Uri): Promise<void> {
-		const res = await fetch(serverApiUrl + "/create-folder", {
+		const res = await fetch(proxyUrl(serverApiUrl + "/create-folder"), {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -204,7 +193,6 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			})
 		})
 		this.forConnection("createDirectory: " + uri, res)
-		if (res.status == 403) throw vscode.FileSystemError.NoPermissions(uri)
 	}
 
 	public async delete(uri: vscode.Uri, options: { recursive: boolean } = { recursive: true }): Promise<void> {
@@ -217,7 +205,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			if (items && items.length > 0) throw vscode.FileSystemError.Unavailable("Directory not empty")
 		}
 
-		const res = await fetch(serverApiUrl + "/delete", {
+		const res = await fetch(proxyUrl(serverApiUrl + "/delete"), {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -229,22 +217,20 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			})
 		})
 		this.forConnection("delete: " + uri, res)
-		if (res.status == 403) throw vscode.FileSystemError.NoPermissions(uri)
 	}
 
 	public async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
-		const res = await fetch(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path), {
+		const res = await fetch(proxyUrl(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path)), {
 			headers: {
 				Authorization: authHeader,
 				Accept: "application/json"
 			}
 		})
+		this.forConnection("readDirectory: " + uri, res)
 		if (!res.ok) {
 			const json: any = await res.json()
 			if (json.errors[0].code == "DaemonConnectionException") throw vscode.FileSystemError.FileNotFound(uri)
-			throw vscode.FileSystemError.Unavailable(json.errors[0].detail)
 		}
-		this.forConnection("readDirectory: " + uri, res)
 
 		const json: any = await res.json()
 		return json.data.map((file: any) => [
@@ -256,7 +242,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async readFile(uri: vscode.Uri): Promise<Uint8Array> {
-		const res = await fetch(serverApiUrl + "/contents?file=" + encodeURIComponent(uri.path), {
+		const res = await fetch(proxyUrl(serverApiUrl + "/contents?file=" + encodeURIComponent(uri.path)), {
 			headers: {
 				Authorization: authHeader
 			}
@@ -274,7 +260,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			} catch {}
 		}
 
-		const res = await fetch(serverApiUrl + "/rename", {
+		const res = await fetch(proxyUrl(serverApiUrl + "/rename"), {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
@@ -300,7 +286,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 		}
 
 		const folderPath = uri.path.split("/").slice(0, -1).join("/") || "/"
-		const res = await fetch(serverApiUrl + "/list?directory=" + encodeURIComponent(folderPath), {
+		const res = await fetch(proxyUrl(serverApiUrl + "/list?directory=" + encodeURIComponent(folderPath)), {
 			headers: {
 				Authorization: authHeader,
 				Accept: "application/json"
@@ -338,7 +324,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			if (!options.create) throw vscode.FileSystemError.FileNotFound(uri)
 		}
 
-		const res = await fetch(serverApiUrl + "/write?file=" + uri.path, {
+		const res = await fetch(proxyUrl(serverApiUrl + "/write?file=" + uri.path), {
 			method: "POST",
 			headers: {
 				Authorization: authHeader
@@ -346,7 +332,6 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			body: content
 		})
 		this.forConnection("writeFile: " + uri, res)
-		if (res.status == 403) throw vscode.FileSystemError.NoPermissions(uri)
 	}
 
 	public watch(): vscode.Disposable {

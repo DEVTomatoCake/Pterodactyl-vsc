@@ -2,12 +2,12 @@
 	"compilerOptions": {
 		"strictNullChecks": true,
 		"module": "commonjs",
-		"target": "es2020",
-		"lib": ["es2020"],
+		"target": "es2022",
+		"lib": ["es2022"],
 		"outDir": "out",
 		"sourceMap": true,
 		"strict": true,
 		"rootDir": "."
 	},
-	"exclude": ["node_modules", ".vscode-test"]
+	"exclude": ["node_modules"]
 }
