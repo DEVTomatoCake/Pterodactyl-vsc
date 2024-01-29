@@ -108,7 +108,7 @@
 		"sideload-win": "npx serve --cors -l 5000 --ssl-cert %userprofile%\\certs\\localhost.pem --ssl-key %userprofile%\\certs\\localhost-key.pem"
 	},
 	"devDependencies": {
-		"@types/node": "^20.11.8",
+		"@types/node": "^20.11.10",
 		"@types/vscode": "^1.85.0",
 		"@typescript-eslint/eslint-plugin": "^6.20.0",
 		"@typescript-eslint/parser": "^6.19.1",
