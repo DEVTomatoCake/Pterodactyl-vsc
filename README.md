@@ -51,14 +51,17 @@ export default {
 	}
 }
 ```
+
 2. If you have access to the domain owning the panel, you can overwrite CORS headers to the panel's responses, e.g. using Cloudflare Transform Rules:
-	> [!CAUTION]
-	> This will allow any website to access the panel's API using the credentials of the user who's logged in to the panel. If possible, replace `*` with the hostname of the website the extension is mainly used on, e.g. `vscode.dev`.
-	1. Open the "Transform Rules" tab of your domain and create a new response header overwrite.
-	2. Select "Custom filter".
-	3. Select "Hostname" and enter the hostname (e.g. panel.example.com) of your panel.
-	4. Select URI path with "Starts with" and enter `/api/client/servers/`.
-	5. Add a new static response header with the key `Access-Control-Allow-Origin` and the value `*`.
+> [!CAUTION]
+> This will allow any website to access the panel's API using the credentials of the user who's logged in to the panel. If possible, replace `*` with the hostname of the website the extension is mainly used on, e.g. `vscode.dev`.
+
+- Open the "Transform Rules" tab of your domain and create a new response header overwrite.
+- Select "Custom filter".
+- Select "Hostname" and enter the hostname (e.g. panel.example.com) of your panel.
+- Select URI path with "Starts with" and enter `/api/client/servers/`.
+- Add a new static response header with the key `Access-Control-Allow-Origin` and the value `*`.
+
 3. If you want to build the extension yourself and you're only using it locally in the VS Code Desktop app, you can disable the web build of it by removing the `browser` field in the package.json. This works because only the web build has to use the JS Fetch API, which is affected by CORS.
 
 ## Credits
