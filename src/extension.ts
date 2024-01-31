@@ -8,6 +8,7 @@ let authHeader = ""
 let outputChannel: vscode.OutputChannel
 const log = (message: any): void => outputChannel.appendLine(message)
 const proxyUrl = (url: string): string => vscode.workspace.getConfiguration("pterodactyl-vsc").get("proxyUrl") + encodeURIComponent(url)
+const removeStartSlash = (path: string): string => path.replace(/^\//, "")
 
 export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
@@ -21,6 +22,17 @@ export function activate(context: vscode.ExtensionContext) {
 	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") && vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId"))
 		serverApiUrl = vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
 	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
+
+	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+		log("Detected configuration change")
+		if (event.affectsConfiguration("pterodactyl-vsc.panelUrl") || event.affectsConfiguration("pterodactyl-vsc.serverId")) {
+			const parsedUrl = vscode.Uri.parse(vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") || "")
+			log("Setting server api URL to " + parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files")
+			serverApiUrl = parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
+		}
+
+		if (event.affectsConfiguration("pterodactyl-vsc.apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
+	}))
 
 	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.init", _ => {
 		addPanel()
@@ -52,6 +64,7 @@ async function addPanel() {
 	const url = await vscode.window.showInputBox({
 		prompt: "Enter the Pterodactyl panel URL",
 		placeHolder: "Enter a Pterodactyl panel URL here...",
+		value: vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl"),
 		validateInput: validatePanelURL
 	})
 	if (!url || validatePanelURL(url)) return
@@ -77,7 +90,6 @@ async function addPanel() {
 	if (!req.ok) return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel: " + req.status + " " + req.statusText)
 
 	const json: any = await req.json()
-	log(json)
 	vscode.workspace.getConfiguration("pterodactyl-vsc").update("apiKey", apiKey)
 
 	log("Connected successfully, " + json.data.length + " servers found")
@@ -114,10 +126,6 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 
 	public readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]>
 
-	private removeStartSlash(path: string): string {
-		return path.replace(/^\//, "")
-	}
-
 	private async forConnection(operation: string, res: Response): Promise<void> {
 		log(operation + ": " + res.status + " " + res.statusText)
 		switch (res.status) {
@@ -129,6 +137,9 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				throw vscode.FileSystemError.NoPermissions(res.url)
 			case 404:
 				throw vscode.FileSystemError.FileNotFound(res.url)
+			case 422:
+				const json: any = await res.json()
+				throw vscode.FileSystemError.Unavailable(json.errors[0].detail)
 			case 429:
 				throw vscode.FileSystemError.Unavailable("You have been ratelimited by the Pterodactyl panel.")
 		}
@@ -151,8 +162,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				location: source.path
 			})
 		})
-		this.forConnection("copy: " + source.path + " -> " + destination.path, copyRes)
-		if (!copyRes.ok) throw await copyRes.json()
+		await this.forConnection("copy: " + source.path + " -> " + destination.path, copyRes)
 
 		const oldPath = source.path.split("/").slice(0, -1).join("/") || "/"
 		const oldName = source.path.split("/").pop()
@@ -170,14 +180,12 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			body: JSON.stringify({
 				root: "/",
 				files: [{
-					from: this.removeStartSlash(oldPath + "/") + copiedLoc,
-					to: this.removeStartSlash(newPath + "/") + destination.path.split("/").pop()
+					from: removeStartSlash(oldPath + "/") + copiedLoc,
+					to: removeStartSlash(newPath + "/") + destination.path.split("/").pop()
 				}]
 			})
 		})
-		if (!renameRes.ok) throw await renameRes.json()
-
-		this.forConnection("rename after copy: " + source.path + " -> " + destination.path, renameRes)
+		await this.forConnection("rename after copy: " + source.path + " -> " + destination.path, renameRes)
 	}
 
 	public async createDirectory(uri: vscode.Uri): Promise<void> {
@@ -192,7 +200,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				name: uri.path
 			})
 		})
-		this.forConnection("createDirectory: " + uri, res)
+		await this.forConnection("createDirectory: " + uri, res)
 	}
 
 	public async delete(uri: vscode.Uri, options: { recursive: boolean } = { recursive: true }): Promise<void> {
@@ -213,24 +221,22 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			},
 			body: JSON.stringify({
 				root: "/",
-				files: [this.removeStartSlash(uri.path)]
+				files: [removeStartSlash(uri.path)]
 			})
 		})
-		this.forConnection("delete: " + uri, res)
+		await this.forConnection("delete: " + uri, res)
 	}
 
 	public async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
+		log("Reading directory: " + proxyUrl(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path)))
 		const res = await fetch(proxyUrl(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path)), {
 			headers: {
 				Authorization: authHeader,
 				Accept: "application/json"
 			}
 		})
-		this.forConnection("readDirectory: " + uri, res)
-		if (!res.ok) {
-			const json: any = await res.json()
-			if (json.errors[0].code == "DaemonConnectionException") throw vscode.FileSystemError.FileNotFound(uri)
-		}
+		log("readDirectory response: " + res.status + " " + res.statusText)
+		await this.forConnection("readDirectory: " + uri, res)
 
 		const json: any = await res.json()
 		return json.data.map((file: any) => [
@@ -247,9 +253,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				Authorization: authHeader
 			}
 		})
-		this.forConnection("readFile: " + uri, res)
-		if (!res.ok) throw vscode.FileSystemError.FileNotFound(uri)
-
+		await this.forConnection("readFile: " + uri, res)
 		return new Uint8Array(await res.arrayBuffer())
 	}
 
@@ -269,12 +273,12 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			body: JSON.stringify({
 				root: "/",
 				files: [{
-					from: this.removeStartSlash(oldUri.path),
-					to: this.removeStartSlash(newUri.path)
+					from: removeStartSlash(oldUri.path),
+					to: removeStartSlash(newUri.path)
 				}]
 			})
 		})
-		this.forConnection("rename: " + oldUri + " -> " + newUri, res)
+		await this.forConnection("rename: " + oldUri + " -> " + newUri, res)
 	}
 
 	public async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
@@ -292,7 +296,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				Accept: "application/json"
 			}
 		})
-		this.forConnection("stat: " + uri, res)
+		await this.forConnection("stat: " + uri, res)
 
 		const json: any = await res.json()
 		if (!res.ok) {
@@ -331,7 +335,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			},
 			body: content
 		})
-		this.forConnection("writeFile: " + uri, res)
+		await this.forConnection("writeFile: " + uri, res)
 	}
 
 	public watch(): vscode.Disposable {

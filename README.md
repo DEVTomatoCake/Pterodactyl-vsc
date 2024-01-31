@@ -17,7 +17,8 @@
 
 ## CORS Proxy
 
-By default the extension uses the proxy URL `https://pterodactyl-vsc.tomatocake.workers.dev/?url=`. The proxy was created by me to circumvent CORS blocking requests to the panel.
+By default the extension uses the proxy URL `https://pterodactyl-vsc.tomatocake.workers.dev/?url=`.
+The proxy was created by me to circumvent CORS blocking requests to the panel.
 
 There are several options available if you don't want to use the default proxy:
 1. Use your own proxy using the following [Cloudflare worker](https://workers.cloudflare.com) code:
@@ -51,6 +52,8 @@ export default {
 }
 ```
 2. If you have access to the domain owning the panel, you can overwrite CORS headers to the panel's responses, e.g. using Cloudflare Transform Rules:
+	> [!CAUTION]
+	> This will allow any website to access the panel's API using the credentials of the user who's logged in to the panel. If possible, replace `*` with the hostname of the website the extension is mainly used on, e.g. `vscode.dev`.
 	1. Open the "Transform Rules" tab of your domain and create a new response header overwrite.
 	2. Select "Custom filter".
 	3. Select "Hostname" and enter the hostname (e.g. panel.example.com) of your panel.
@@ -60,5 +63,5 @@ export default {
 
 ## Credits
 
-- Base yoinked from [microsoft/vscode-extension-samples](https://github.com/microsoft/vscode-extension-samples/tree/main/fsprovider-sample)
+- Base from [microsoft/vscode-extension-samples](https://github.com/microsoft/vscode-extension-samples/tree/main/fsprovider-sample)
 - Most of the logic from [kowd/vscode-webdav](https://github.com/kowd/vscode-webdav)

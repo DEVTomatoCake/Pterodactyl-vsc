@@ -2,7 +2,7 @@
 	"name": "pterodactyl-vsc",
 	"displayName": "Pterodactyl file system",
 	"description": "Open a Pterodactyl server folder as a remote workspace.",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"publisher": "tomatocake",
 	"license": "MIT",
 	"main": "./out/src/extension",
@@ -26,7 +26,9 @@
 	"keywords": [
 		"pterodactyl",
 		"ptero",
-		"file-system-provider"
+		"file-system-provider",
+		"remote-repository",
+		"remote-filesystem"
 	],
 	"contributes": {
 		"commands": [
@@ -69,15 +71,6 @@
 					"description": "Pterodactyl panel URL to connect to.",
 					"format": "uri"
 				},
-				"pterodactyl-vsc.serverId": {
-					"type": "string",
-					"default": "",
-					"description": "Server ID of the server you want to edit the files of, found in the URL.",
-					"minLength": 8,
-					"maxLength": 8,
-					"pattern": "^[a-z0-9]{8}$",
-					"patternErrorMessage": "Invalid short server ID."
-				},
 				"pterodactyl-vsc.apiKey": {
 					"type": "string",
 					"default": "",
@@ -87,11 +80,20 @@
 					"pattern": "^ptlc_[a-zA-Z0-9]{43}$",
 					"patternErrorMessage": "Invalid client API key."
 				},
+				"pterodactyl-vsc.serverId": {
+					"type": "string",
+					"default": "",
+					"description": "Server ID of the server you want to edit the files of, found in the URL.",
+					"minLength": 8,
+					"maxLength": 8,
+					"pattern": "^[a-z0-9]{8}$",
+					"patternErrorMessage": "Invalid short server ID."
+				},
 				"pterodactyl-vsc.proxyUrl": {
 					"type": "string",
 					"default": "https://pterodactyl-vsc.tomatocake.workers.dev/?url=",
 					"description": "CORS proxy to use. Leave empty to disable.",
-					"format": "uri"
+					"pattern": "^(https?://.+)?$"
 				}
 			}
 		}
@@ -108,7 +110,7 @@
 		"sideload-win": "npx serve --cors -l 5000 --ssl-cert %userprofile%\\certs\\localhost.pem --ssl-key %userprofile%\\certs\\localhost-key.pem"
 	},
 	"devDependencies": {
-		"@types/node": "^20.11.10",
+		"@types/node": "^20.11.13",
 		"@types/vscode": "^1.85.0",
 		"@typescript-eslint/eslint-plugin": "^6.20.0",
 		"@typescript-eslint/parser": "^6.20.0",
