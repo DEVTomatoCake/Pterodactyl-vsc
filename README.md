@@ -2,7 +2,7 @@
 
 ## Usage
 
-1. Install the extension from the [marketplace](https://marketplace.visualstudio.com/items?itemName=tomatocake.pterodactyl-vsc) or as VSIX by building it yourself, or by downloading it from the [releases page](https://github.com/DEVTomatoCake/Pterodactyl-vsc/releases).
+1. Install the extension from the [marketplace](https://marketplace.visualstudio.com/items?itemName=TomatoCake.pterodactyl-vsc) or as VSIX by building it yourself, or by downloading it from the [releases page](https://github.com/DEVTomatoCake/Pterodactyl-vsc/releases).
 2. Open the command palette (default: `Ctrl + Shift + P`) and run `Pterodactyl: Connect to server`.
 3. Enter the panel URL and your client (not application) API key from Account Settings -> API Credentials.
 4. Select the server you want to edit the files of.
@@ -13,7 +13,7 @@
 - `pterodactyl-vsc.panelUrl`: The URL of the Pterodactyl panel.
 - `pterodactyl-vsc.serverId`: Server ID of the server you want to edit the files of, found in the URL of the server's page.
 - `pterodactyl-vsc.apiKey`: Client API key of the server you want to edit the files of.
-- `pterodactyl-vsc.proxyUrl`: The proxy URL used to circumvent CORS blocking requests to the panel. Leave it at the default value unless you know what you're doing. See [CORS Proxy](#cors-proxy) for more information.
+- `pterodactyl-vsc.proxyUrl`: The proxy URL used to circumvent CORS blocking `fetch` requests to the panel. Leave it at the default value unless you know what you're doing. See [CORS Proxy](#cors-proxy) for more information.
 
 ## CORS Proxy
 
@@ -21,7 +21,7 @@ By default the extension uses the proxy URL `https://pterodactyl-vsc.tomatocake.
 The proxy was created by me to circumvent CORS blocking requests to the panel.
 
 There are several options available if you don't want to use the default proxy:
-1. Use your own proxy using the following [Cloudflare worker](https://workers.cloudflare.com) code:
+1. Use your own proxy using the following worker code, e.g. by using [Cloudflare Workers](https://workers.cloudflare.com) code:
 ```js
 export default {
 	async fetch(request) {
