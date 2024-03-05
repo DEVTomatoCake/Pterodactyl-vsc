@@ -4,6 +4,14 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      typescript-eslint:
+        patterns:
+        - "@typescript-eslint/*"
+      vscode:
+        patterns:
+        - "@types/vscode"
+        - "@vscode/vsce"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
