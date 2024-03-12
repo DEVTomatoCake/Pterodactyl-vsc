@@ -2,9 +2,9 @@
 
 ## Usage
 
-1. Install the extension from the [marketplace](https://marketplace.visualstudio.com/items?itemName=TomatoCake.pterodactyl-vsc) or as VSIX by building it yourself, or by downloading it from the [releases page](https://github.com/DEVTomatoCake/Pterodactyl-vsc/releases).
+1. Install the extension from the [VS Code marketplace](https://marketplace.visualstudio.com/items?itemName=TomatoCake.pterodactyl-vsc), [Open VSX](https://open-vsx.org/extension/tomatocake/pterodactyl-vsc), as VSIX by building it yourself, or by downloading it from the [releases page](https://github.com/DEVTomatoCake/Pterodactyl-vsc/releases).
 2. Open the command palette (default: `Ctrl + Shift + P`) and run `Pterodactyl: Connect to server`.
-3. Enter the panel URL and your client (not application) API key from Account Settings -> API Credentials.
+3. Enter the panel URL and your client (not application) API key from "Account Settings" -> "API Credentials" -> Enter description -> "Create".
 4. Select the server you want to edit the files of.
 5. Done!
 
