@@ -12,7 +12,7 @@
 
 - `pterodactyl-vsc.panelUrl`: The URL of the Pterodactyl panel.
 - `pterodactyl-vsc.serverId`: Server ID of the server you want to edit the files of, found in the URL of the server's page.
-- `pterodactyl-vsc.apiKey`: Client API key of the server you want to edit the files of.
+- `pterodactyl-vsc.apiKey`: Client API key of a panel account which has access to the server and enough permissions to view, edit and delete files.
 - `pterodactyl-vsc.proxyUrl`: The proxy URL used to circumvent CORS blocking `fetch` requests to the panel. Leave it at the default value unless you know what you're doing. See [CORS Proxy](#cors-proxy) for more information.
 
 ## CORS Proxy
@@ -21,7 +21,7 @@ By default the extension uses the proxy URL `https://pterodactyl-vsc.tomatocake.
 The proxy was created by me to circumvent CORS blocking requests to the panel.
 
 There are several options available if you don't want to use the default proxy:
-1. Use your own proxy using the following worker code, e.g. by using [Cloudflare Workers](https://workers.cloudflare.com) code:
+1. Use your own proxy using the following worker code, e.g. by using the following [Cloudflare Workers](https://workers.cloudflare.com) code:
 ```js
 export default {
 	async fetch(request) {
@@ -52,9 +52,10 @@ export default {
 }
 ```
 
-2. If you have access to the domain owning the panel, you can overwrite CORS headers to the panel's responses, e.g. using Cloudflare Transform Rules:
+2. If you have access to the domain owning the panel, you can overwrite CORS headers to the panel's responses, e.g. using Cloudflares [Transform Rules](https://developers.cloudflare.com/rules/transform/#transform-rules):
 > [!CAUTION]
-> This will allow any website to access the panel's API using the credentials of the user who's logged in to the panel. If possible, replace `*` with the hostname of the website the extension is mainly used on, e.g. `vscode.dev`.
+> This will allow any website to access the panel's API using the credentials of the user who's logged in to the panel.
+> If possible, always replace `*` with the hostname of the website the extension is used on, e.g. `vscode.dev`.
 
 - Open the "Transform Rules" tab of your domain and create a new response header overwrite.
 - Select "Custom filter".
@@ -62,7 +63,7 @@ export default {
 - Select URI path with "Starts with" and enter `/api/client/servers/`.
 - Add a new static response header with the key `Access-Control-Allow-Origin` and the value `*`.
 
-3. If you want to build the extension yourself and you're only using it locally in the VS Code Desktop app, you can disable the web build of it by removing the `browser` field in the package.json. This works because only the web build has to use the JS Fetch API, which is affected by CORS.
+3. If you want to build the extension yourself and you're only using it locally in the VS Code Desktop app, you can disable the web build of it by removing the `browser` property in the package.json. This works because only web-enabled extensions have to use the JavaScript Fetch API, which is affected by CORS.
 
 ## Credits
 

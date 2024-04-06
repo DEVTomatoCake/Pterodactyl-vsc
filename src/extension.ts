@@ -1,4 +1,4 @@
-"use strict";
+"use strict"
 
 import * as vscode from "vscode"
 
@@ -6,7 +6,7 @@ let serverApiUrl = ""
 let authHeader = ""
 
 let outputChannel: vscode.OutputChannel
-const log = (message: any): void => outputChannel.appendLine(message)
+const log = (message: string): void => outputChannel.appendLine(message)
 const proxyUrl = (url: string): string => vscode.workspace.getConfiguration("pterodactyl-vsc").get("proxyUrl") + encodeURIComponent(url)
 const removeStartSlash = (path: string): string => path.replace(/^\//, "")
 
@@ -34,11 +34,11 @@ export function activate(context: vscode.ExtensionContext) {
 		if (event.affectsConfiguration("pterodactyl-vsc.apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
 	}))
 
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.init", _ => {
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.init", () => {
 		addPanel()
 	}))
 
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.reset", _ => {
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.reset", () => {
 		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0)
 
 		serverApiUrl = ""
@@ -73,7 +73,7 @@ async function addPanel() {
 
 	const apiKey = await vscode.window.showInputBox({
 		prompt: "Enter your Pterodactyl API key",
-		placeHolder: "Enter your Pterodactyl API key here...",
+		placeHolder: "Enter your Pterodactyl panel client API key here...",
 		validateInput: (value: string) => value ? (value.length == 48 ? void 0 : "API keys are 48 characters long") : "Enter a valid API key",
 		password: true
 	})
@@ -85,9 +85,24 @@ async function addPanel() {
 			Accept: "application/json",
 			Authorization: "Bearer " + apiKey
 		}
+	}).catch(e => {
+		log(e)
+		vscode.window.showErrorMessage("Failed to connect to the provided address: " + e.message)
 	})
+	if (!req) return
+
 	log("Connection response: " + req.status + " " + req.statusText)
-	if (!req.ok) return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel: " + req.status + " " + req.statusText)
+	if (!req.ok) {
+		const text: string = await req.text()
+		try {
+			const jsonParsed: any = JSON.parse(text)
+			log(JSON.stringify(jsonParsed, null, "\t"))
+			return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel (" + req.status + "): " + jsonParsed.errors[0].detail)
+		} catch {
+			log(text)
+			return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel (" + req.status + "): " + text.substring(0, 50) + (text.length > 50 ? "..." : ""))
+		}
+	}
 
 	const json: any = await req.json()
 	vscode.workspace.getConfiguration("pterodactyl-vsc").update("apiKey", apiKey)
@@ -116,7 +131,6 @@ async function addPanel() {
 }
 
 export class PterodactylFileSystemProvider implements vscode.FileSystemProvider {
-
 	private readonly _eventEmitter: vscode.EventEmitter<vscode.FileChangeEvent[]>
 
 	public constructor() {
@@ -304,7 +318,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			throw vscode.FileSystemError.Unavailable(json.errors[0].detail)
 		}
 
-		const file = json.data.find((file: any) => file.attributes.name == uri.path.split("/").pop())?.attributes
+		const file = json.data.find((f: any) => f.attributes.name == uri.path.split("/").pop())?.attributes
 		if (!file) throw vscode.FileSystemError.FileNotFound(uri)
 
 		return {
@@ -320,7 +334,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 
 	public async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
 		try {
-			let stat = await this.stat(uri)
+			const stat = await this.stat(uri)
 			if (stat.type == vscode.FileType.Directory) throw vscode.FileSystemError.FileIsADirectory(uri)
 
 			if (!options.overwrite) throw vscode.FileSystemError.FileExists(uri)

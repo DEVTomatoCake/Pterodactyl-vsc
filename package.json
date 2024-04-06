@@ -2,7 +2,7 @@
 	"name": "pterodactyl-vsc",
 	"displayName": "Pterodactyl file system",
 	"description": "Open a Pterodactyl server folder as a remote workspace.",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"publisher": "tomatocake",
 	"license": "MIT",
 	"main": "./out/src/extension",
@@ -15,7 +15,7 @@
 		"url": "https://github.com/TomatoCake/Pterodactyl-vsc.git"
 	},
 	"engines": {
-		"vscode": "^1.87.0"
+		"vscode": "^1.88.0"
 	},
 	"categories": [
 		"Other"
@@ -102,7 +102,7 @@
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
-		"lint": "eslint --ext .ts",
+		"lint": "eslint .",
 		"watch": "tsc -watch -p ./",
 		"pack": "vsce pack -o ./out/pterodactyl-vsc.vsix -t web",
 		"pack-files": "vsce ls",
@@ -112,14 +112,15 @@
 		"sideload-win": "npx serve --cors -l 5000 --ssl-cert %userprofile%\\certs\\localhost.pem --ssl-key %userprofile%\\certs\\localhost-key.pem"
 	},
 	"devDependencies": {
-		"@types/node": "^20.12.2",
-		"@types/vscode": "^1.87.0",
-		"@typescript-eslint/eslint-plugin": "^7.4.0",
-		"@typescript-eslint/parser": "^7.4.0",
+		"@stylistic/eslint-plugin-js": "^1.7.0",
+		"@types/node": "^20.12.5",
+		"@types/vscode": "^1.88.0",
+		"@typescript-eslint/eslint-plugin": "^7.5.0",
+		"@typescript-eslint/parser": "^7.5.0",
 		"@vscode/vsce": "^2.24.0",
 		"eslint": "^8.57.0",
-		"eslint-plugin-sonarjs": "^0.24.0",
-		"eslint-plugin-unicorn": "^51.0.1",
-		"typescript": "^5.4.3"
+		"eslint-plugin-sonarjs": "^0.25.1",
+		"eslint-plugin-unicorn": "^52.0.0",
+		"typescript": "^5.4.4"
 	}
 }
