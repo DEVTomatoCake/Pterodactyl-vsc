@@ -2,7 +2,7 @@
 	"name": "pterodactyl-vsc",
 	"displayName": "Pterodactyl file system",
 	"description": "Open a Pterodactyl server folder as a remote workspace.",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"publisher": "tomatocake",
 	"license": "MIT",
 	"main": "./out/src/extension",
@@ -12,7 +12,7 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/TomatoCake/Pterodactyl-vsc.git"
+		"url": "https://github.com/DEVTomatoCake/Pterodactyl-vsc.git"
 	},
 	"engines": {
 		"vscode": "^1.88.0"
