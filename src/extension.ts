@@ -10,126 +10,6 @@ const log = (message: string): void => outputChannel.appendLine(message)
 const proxyUrl = (url: string): string => vscode.workspace.getConfiguration("pterodactyl-vsc").get("proxyUrl") + encodeURIComponent(url)
 const removeStartSlash = (path: string): string => path.replace(/^\//, "")
 
-export function activate(context: vscode.ExtensionContext) {
-	context.subscriptions.push(
-		outputChannel = vscode.window.createOutputChannel("Pterodactyl file system")
-	)
-	log("Loading extension...")
-
-	const fsProvider = new PterodactylFileSystemProvider()
-	context.subscriptions.push(vscode.workspace.registerFileSystemProvider("pterodactyl", fsProvider, { isCaseSensitive: true }))
-
-	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") && vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId"))
-		serverApiUrl = vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
-	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
-
-	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
-		log("Detected configuration change")
-		if (event.affectsConfiguration("pterodactyl-vsc.panelUrl") || event.affectsConfiguration("pterodactyl-vsc.serverId")) {
-			const parsedUrl = vscode.Uri.parse(vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") || "")
-			log("Setting server api URL to " + parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files")
-			serverApiUrl = parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
-		}
-
-		if (event.affectsConfiguration("pterodactyl-vsc.apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
-	}))
-
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.init", () => {
-		addPanel()
-	}))
-
-	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.reset", () => {
-		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0)
-
-		serverApiUrl = ""
-		authHeader = ""
-
-		log("Reset workspace")
-	}))
-}
-
-// Modified from https://github.com/kowd/vscode-webdav/blob/12a5f44d60ccf81430d70f3e50b04259524a403f/src/extension.ts#L147
-const validatePanelURL = (value: string): string | undefined => {
-	if (value) {
-		try {
-			const uri = vscode.Uri.parse(value.trim())
-			if (uri.scheme != "http" && uri.scheme != "https") return "Unsupported protocol: " + uri.scheme
-		} catch {
-			return "Enter a valid URL"
-		}
-	} else return "Enter a valid URL"
-}
-
-async function addPanel() {
-	const url = await vscode.window.showInputBox({
-		prompt: "Enter the Pterodactyl panel URL",
-		placeHolder: "Enter a Pterodactyl panel URL here...",
-		value: vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl"),
-		validateInput: validatePanelURL
-	})
-	if (!url || validatePanelURL(url)) return
-
-	const panelUrl = vscode.Uri.parse(url.trim())
-
-	const apiKey = await vscode.window.showInputBox({
-		prompt: "Enter your Pterodactyl API key",
-		placeHolder: "Enter your Pterodactyl panel client API key here...",
-		validateInput: (value: string) => value ? (value.length == 48 ? void 0 : "API keys are 48 characters long") : "Enter a valid API key",
-		password: true
-	})
-	if (!apiKey || apiKey.length != 48) return vscode.window.showErrorMessage("Invalid API key, must be 48 characters long")
-
-	log("Connecting to " + panelUrl.scheme + "://" + panelUrl.authority + "...")
-	const req = await fetch(proxyUrl(panelUrl.scheme + "://" + panelUrl.authority + "/api/client/"), {
-		headers: {
-			Accept: "application/json",
-			Authorization: "Bearer " + apiKey
-		}
-	}).catch(e => {
-		log(e)
-		vscode.window.showErrorMessage("Failed to connect to the provided address: " + e.message)
-	})
-	if (!req) return
-
-	log("Connection response: " + req.status + " " + req.statusText)
-	if (!req.ok) {
-		const text: string = await req.text()
-		try {
-			const jsonParsed: any = JSON.parse(text)
-			log(JSON.stringify(jsonParsed, null, "\t"))
-			return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel (" + req.status + "): " + jsonParsed.errors[0].detail)
-		} catch {
-			log(text)
-			return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel (" + req.status + "): " + text.substring(0, 50) + (text.length > 50 ? "..." : ""))
-		}
-	}
-
-	const json: any = await req.json()
-	vscode.workspace.getConfiguration("pterodactyl-vsc").update("apiKey", apiKey)
-
-	log("Connected successfully, " + json.data.length + " servers found")
-	const serverId: any = await vscode.window.showQuickPick(json.data.map((server: any) => ({
-		label: server.attributes.name,
-		description: server.attributes.identifier,
-		detail: server.attributes.description
-	})), {
-		placeHolder: "Select a server to load into VS Code..."
-	})
-	if (!serverId) return
-
-	serverApiUrl = panelUrl.scheme + "://" + panelUrl.authority + "/api/client/servers/" + serverId.description + "/files"
-	authHeader = "Bearer " + apiKey
-	log("Setting server api URL & auth header to " + serverApiUrl)
-
-	vscode.workspace.getConfiguration("pterodactyl-vsc").update("panelUrl", panelUrl.scheme + "://" + panelUrl.authority)
-	vscode.workspace.getConfiguration("pterodactyl-vsc").update("serverId", serverId.description)
-
-	vscode.workspace.updateWorkspaceFolders(0, 0, {
-		uri: vscode.Uri.parse("pterodactyl:/"),
-		name: "Pterodactyl - " + json.data.find((server: any) => server.attributes.identifier == serverId.description)?.attributes.name
-	})
-}
-
 export class PterodactylFileSystemProvider implements vscode.FileSystemProvider {
 	private readonly _eventEmitter: vscode.EventEmitter<vscode.FileChangeEvent[]>
 
@@ -357,4 +237,124 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 			dispose: () => {}
 		}
 	}
+}
+
+export function activate(context: vscode.ExtensionContext) {
+	context.subscriptions.push(
+		outputChannel = vscode.window.createOutputChannel("Pterodactyl file system")
+	)
+	log("Loading extension...")
+
+	const fsProvider = new PterodactylFileSystemProvider()
+	context.subscriptions.push(vscode.workspace.registerFileSystemProvider("pterodactyl", fsProvider, { isCaseSensitive: true }))
+
+	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") && vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId"))
+		serverApiUrl = vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
+	if (vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
+
+	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+		log("Detected configuration change")
+		if (event.affectsConfiguration("pterodactyl-vsc.panelUrl") || event.affectsConfiguration("pterodactyl-vsc.serverId")) {
+			const parsedUrl = vscode.Uri.parse(vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") || "")
+			log("Setting server api URL to " + parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files")
+			serverApiUrl = parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
+		}
+
+		if (event.affectsConfiguration("pterodactyl-vsc.apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
+	}))
+
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.init", () => {
+		addPanel()
+	}))
+
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.reset", () => {
+		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0)
+
+		serverApiUrl = ""
+		authHeader = ""
+
+		log("Reset workspace")
+	}))
+}
+
+// Modified from https://github.com/kowd/vscode-webdav/blob/12a5f44d60ccf81430d70f3e50b04259524a403f/src/extension.ts#L147
+const validatePanelURL = (value: string): string | undefined => {
+	if (value) {
+		try {
+			const uri = vscode.Uri.parse(value.trim())
+			if (uri.scheme != "http" && uri.scheme != "https") return "Unsupported protocol: " + uri.scheme
+		} catch {
+			return "Enter a valid URL"
+		}
+	} else return "Enter a valid URL"
+}
+
+async function addPanel() {
+	const url = await vscode.window.showInputBox({
+		prompt: "Enter the Pterodactyl panel URL",
+		placeHolder: "Enter a Pterodactyl panel URL here...",
+		value: vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl"),
+		validateInput: validatePanelURL
+	})
+	if (!url || validatePanelURL(url)) return
+
+	const panelUrl = vscode.Uri.parse(url.trim())
+
+	const apiKey = await vscode.window.showInputBox({
+		prompt: "Enter your Pterodactyl API key",
+		placeHolder: "Enter your Pterodactyl panel client API key here...",
+		validateInput: (value: string) => value ? (value.length == 48 ? void 0 : "API keys are 48 characters long") : "Enter a valid API key",
+		password: true
+	})
+	if (!apiKey || apiKey.length != 48) return vscode.window.showErrorMessage("Invalid API key, must be 48 characters long")
+
+	log("Connecting to " + panelUrl.scheme + "://" + panelUrl.authority + "...")
+	const req = await fetch(proxyUrl(panelUrl.scheme + "://" + panelUrl.authority + "/api/client/"), {
+		headers: {
+			Accept: "application/json",
+			Authorization: "Bearer " + apiKey
+		}
+	}).catch(e => {
+		log(e)
+		vscode.window.showErrorMessage("Failed to connect to the provided address: " + e.message)
+	})
+	if (!req) return
+
+	log("Connection response: " + req.status + " " + req.statusText)
+	if (!req.ok) {
+		const text: string = await req.text()
+		try {
+			const jsonParsed: any = JSON.parse(text)
+			log(JSON.stringify(jsonParsed, null, "\t"))
+			return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel (" + req.status + "): " + jsonParsed.errors[0].detail)
+		} catch {
+			log(text)
+			return vscode.window.showErrorMessage("Failed to connect to the Pterodactyl panel (" + req.status + "): " + text.substring(0, 50) + (text.length > 50 ? "..." : ""))
+		}
+	}
+
+	const json: any = await req.json()
+	vscode.workspace.getConfiguration("pterodactyl-vsc").update("apiKey", apiKey)
+
+	log("Connected successfully, " + json.data.length + " servers found")
+	const serverId: any = await vscode.window.showQuickPick(json.data.map((server: any) => ({
+		label: server.attributes.name,
+		description: server.attributes.identifier,
+		detail: server.attributes.description
+	})), {
+		placeHolder: "Select a server to load into VS Code..."
+	})
+	if (!serverId) return
+
+	serverApiUrl = panelUrl.scheme + "://" + panelUrl.authority + "/api/client/servers/" + serverId.description + "/files"
+	authHeader = "Bearer " + apiKey
+	log("Setting server api URL & auth header to " + serverApiUrl)
+
+	vscode.workspace.getConfiguration("pterodactyl-vsc").update("panelUrl", panelUrl.scheme + "://" + panelUrl.authority)
+	vscode.workspace.getConfiguration("pterodactyl-vsc").update("serverId", serverId.description)
+
+	vscode.workspace.updateWorkspaceFolders(0, 0, {
+		uri: vscode.Uri.parse("pterodactyl:/"),
+		name: "Pterodactyl - " + json.data.find((server: any) => server.attributes.identifier == serverId.description)?.attributes.name
+	})
 }
