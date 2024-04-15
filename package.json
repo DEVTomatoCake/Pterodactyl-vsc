@@ -121,6 +121,6 @@
 		"eslint": "^8.57.0",
 		"eslint-plugin-sonarjs": "^0.25.1",
 		"eslint-plugin-unicorn": "^52.0.0",
-		"typescript": "^5.4.4"
+		"typescript": "^5.4.5"
 	}
 }
