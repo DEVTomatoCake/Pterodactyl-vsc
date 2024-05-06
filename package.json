@@ -119,7 +119,7 @@
 		"@typescript-eslint/parser": "^7.8.0",
 		"@vscode/vsce": "^2.26.1",
 		"eslint": "^8.57.0",
-		"eslint-plugin-sonarjs": "^0.25.1",
+		"eslint-plugin-sonarjs": "^1.0.3",
 		"eslint-plugin-unicorn": "^52.0.0",
 		"typescript": "^5.4.5"
 	}
