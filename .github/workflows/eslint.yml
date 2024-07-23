@@ -1,7 +1,6 @@
 name: ESLint
 
 on:
-  pull_request:
   push:
 
 jobs:
@@ -15,11 +14,11 @@ jobs:
       - name: "🔧 setup node"
         uses: actions/setup-node@v4
         with:
-          node-version: 21
+          node-version: 22
           cache: "npm"
 
       - name: "🛸 install eslint plugins"
-        run: npm i --omit=optional --include=dev --no-fund --progress=false
+        run: npm i --omit=optional --include=dev --no-fund --progress=false --legacy-peer-deps
 
       - name: "🔍 lint code"
         run: npm run lint
