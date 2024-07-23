@@ -4,15 +4,31 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+      time: "05:00"
+      timezone: "Europe/Berlin"
+    assignees:
+      - "DEVTomatoCake"
     groups:
-      typescript-eslint:
+      eslint:
         patterns:
-        - "@typescript-eslint/*"
+          - "@html-parser/eslint-plugin"
+          - "@html-parser/parser"
+          - "@stylistic/eslint-plugin-js"
+          - "eslint"
+          - "eslint-plugin-*"
+          - "@typescript-eslint/*"
       vscode:
         patterns:
-        - "@types/vscode"
-        - "@vscode/vsce"
+          - "@types/node"
+          - "@types/vscode"
+          - "@vscode/vsce"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "saturday"
+      time: "05:00"
+      timezone: "Europe/Berlin"
+    assignees:
+      - "DEVTomatoCake"
