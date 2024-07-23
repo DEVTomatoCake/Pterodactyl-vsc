@@ -36,10 +36,18 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				throw vscode.FileSystemError.Unavailable(json.errors[0].detail)
 			case 429:
 				throw vscode.FileSystemError.Unavailable("You have been ratelimited by the Pterodactyl panel.")
+			case 500:
+				const text: string = await res.text()
+				log("-> Response: " + text)
+				throw vscode.FileSystemError.Unavailable("The server (or a proxy) was unable to handle the request. Check Output -> Pterodactyl for more information.")
+			default:
+				if (!res.ok) throw vscode.FileSystemError.Unavailable("Unknown error: " + res.status + " " + res.statusText)
 		}
 	}
 
 	public async copy(source: vscode.Uri, destination: vscode.Uri, options: { overwrite: boolean } = { overwrite: false }): Promise<void> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		if (options.overwrite) {
 			try {
 				await this.delete(destination)
@@ -83,6 +91,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async createDirectory(uri: vscode.Uri): Promise<void> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		const res = await fetch(proxyUrl(serverApiUrl + "/create-folder"), {
 			method: "POST",
 			headers: {
@@ -98,6 +108,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async delete(uri: vscode.Uri, options: { recursive: boolean } = { recursive: true }): Promise<void> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		if (options.recursive === false) {
 			let items: any = []
 			try {
@@ -122,6 +134,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		log("Reading directory: " + proxyUrl(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path)))
 		const res = await fetch(proxyUrl(serverApiUrl + "/list?directory=" + encodeURIComponent(uri.path)), {
 			headers: {
@@ -142,6 +156,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async readFile(uri: vscode.Uri): Promise<Uint8Array> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		const res = await fetch(proxyUrl(serverApiUrl + "/contents?file=" + encodeURIComponent(uri.path)), {
 			headers: {
 				Authorization: authHeader
@@ -152,6 +168,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean } = { overwrite: false }): Promise<void> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		if (options.overwrite) {
 			try {
 				await this.delete(newUri)
@@ -176,6 +194,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		if (uri.path == "/") return {
 			ctime: 0,
 			mtime: 0,
@@ -213,6 +233,8 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	}
 
 	public async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
+		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
+
 		try {
 			const stat = await this.stat(uri)
 			if (stat.type == vscode.FileType.Directory) throw vscode.FileSystemError.FileIsADirectory(uri)
