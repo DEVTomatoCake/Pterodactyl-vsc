@@ -10,6 +10,7 @@ module.exports = [
 		languageOptions: {
 			globals: {
 				fetch: "readonly",
+				setTimeout: "readonly",
 				Response: "readonly"
 			},
 			parser: require("@typescript-eslint/parser")

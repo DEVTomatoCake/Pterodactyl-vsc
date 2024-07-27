@@ -5,3 +5,4 @@ out/src/*.js.map
 
 .gitignore
 tsconfig.json
+eslint.config.js

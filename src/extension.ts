@@ -92,6 +92,9 @@ const addPanel = async () => {
 	})
 }
 
+const responseCache = new Map()
+const responseCacheHits = new Map()
+
 export class PterodactylFileSystemProvider implements vscode.FileSystemProvider {
 	private readonly _eventEmitter: vscode.EventEmitter<vscode.FileChangeEvent[]>
 
@@ -278,6 +281,11 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 	public async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
 		if (serverApiUrl == "") throw vscode.FileSystemError.Unavailable("No server API URL set, please init the extension first.")
 
+		if (responseCache.has("stat:" + uri.toString())) {
+			responseCacheHits.set("stat:" + uri.toString(), responseCacheHits.get("stat:" + uri.toString()) + 1)
+			return responseCache.get("stat:" + uri.toString())
+		}
+
 		if (uri.path == "/") return {
 			ctime: 0,
 			mtime: 0,
@@ -303,7 +311,7 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 		const file = json.data.find((f: any) => f.attributes.name == uri.path.split("/").pop())?.attributes
 		if (!file) throw vscode.FileSystemError.FileNotFound(uri)
 
-		return {
+		const response = {
 			ctime: new Date(file.created_at).getTime(),
 			mtime: new Date(file.modified_at).getTime(),
 			permissions: file.mode[2] == "w" ? void 0 : vscode.FilePermission.Readonly,
@@ -312,6 +320,17 @@ export class PterodactylFileSystemProvider implements vscode.FileSystemProvider 
 				? (file.is_symlink ? vscode.FileType.File | vscode.FileType.SymbolicLink : vscode.FileType.File)
 				: (file.is_symlink ? vscode.FileType.Directory | vscode.FileType.SymbolicLink : vscode.FileType.Directory)
 		}
+
+		responseCache.set("stat:" + uri.toString(), response)
+		responseCacheHits.set("stat:" + uri.toString(), 0)
+		setTimeout(() => {
+			log(responseCacheHits.get("stat:" + uri.toString()) + " cache hits for stat requests on " + uri.toString())
+
+			responseCache.delete("stat:" + uri.toString())
+			responseCacheHits.delete("stat:" + uri.toString())
+		}, 1000 * 10)
+
+		return response
 	}
 
 	public async writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): Promise<void> {
@@ -359,10 +378,13 @@ export const activate = (context: vscode.ExtensionContext) => {
 	context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
 		log("Detected configuration change")
 		if (event.affectsConfiguration("pterodactyl-vsc.panelUrl") || event.affectsConfiguration("pterodactyl-vsc.serverId")) {
+			const serverId = vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId")
+			if (!serverId) return log("-> No server ID set, not updating server API URL")
+
 			const parsedUrl = vscode.Uri.parse(vscode.workspace.getConfiguration("pterodactyl-vsc").get("panelUrl") || "")
-			log("Setting server api URL to " + parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" +
-				vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files")
-			serverApiUrl = parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + vscode.workspace.getConfiguration("pterodactyl-vsc").get("serverId") + "/files"
+
+			log("Setting server api URL to " + parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + serverId + "/files")
+			serverApiUrl = parsedUrl.scheme + "://" + parsedUrl.authority + "/api/client/servers/" + serverId + "/files"
 		}
 
 		if (event.affectsConfiguration("pterodactyl-vsc.apiKey")) authHeader = "Bearer " + vscode.workspace.getConfiguration("pterodactyl-vsc").get("apiKey")
@@ -379,5 +401,14 @@ export const activate = (context: vscode.ExtensionContext) => {
 		authHeader = ""
 
 		log("Reset workspace")
+	}))
+
+	context.subscriptions.push(vscode.commands.registerCommand("pterodactyl-vsc.refresh", () => {
+		log("Refreshing workspace server files...")
+
+		vscode.workspace.updateWorkspaceFolders(0, vscode.workspace.workspaceFolders?.length || 0, {
+			uri: vscode.Uri.parse("pterodactyl:/"),
+			name: "Pterodactyl"
+		})
 	}))
 }
